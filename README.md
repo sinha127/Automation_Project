@@ -1,5 +1,5 @@
 # Automation_Project
-steps to Automate the script
+#steps to Automate the script
 git clone <git url>
 cd Automation_Project
 nano automation.sh
