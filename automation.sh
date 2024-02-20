@@ -1,39 +1,41 @@
 #!/bin/bash
 
-# Update the package details and the package list
+# Update package details and package list
 sudo apt update -y
 
-# Install the apache2 package if it is not already installed
-if ! dpkg -s apache2 &> /dev/null; then
-sudo apt install -y apache2
+# Install apache2 if not already installed
+if ! dpkg -l | grep -q apache2; then
+    sudo apt install apache2 -y
 fi
 
-# Check if Apache is running
-if systemctl --quiet is-active apache2; then
-    echo "Apache is running"
-else
-    # Start Apache
-    echo "Starting Apache"
-    sudo systemctl start apache2
+# Ensure apache2 service is running and enabled
+sudo systemctl start apache2
+sudo systemctl enable apache2
+
+# Bookkeeping
+inventory_file="/var/www/html/inventory.html"
+timestamp=$(date +"%m%d%Y%H%M%S")
+tar_name="httpd-logs-${timestamp}.tar"
+
+# Check if inventory file exists
+if [ ! -f "${inventory_file}" ]; then
+    echo -e "Log Type\t\tTime Created\t\tType\t\tSize" > "${inventory_file}"
 fi
 
-
-
-# Check if Apache service is enabled
-if systemctl --quiet is-enabled apache2; then
-    echo "Apache service is enabled"
-else
-    # Enable Apache service
-    echo "Enabling Apache service"
-    sudo systemctl enable apache2
-fi
-
-# Create a tar archive of apache2 access logs and error logs
-timestamp=$(date '+%d%m%Y-%H%M%S')
-myname="shubham"
-tar_name="${myname}-httpd-logs-${timestamp}.tar"
+# Archive logs
 sudo tar czf /tmp/${tar_name} /var/log/apache2/*.log
 
 # Copy the archive to the s3 bucket using the AWS CLI
 s3_bucket="upgrad-shubham"
 aws s3 cp /tmp/${tar_name} s3://${s3_bucket}/${tar_name}
+
+# Bookkeeping
+echo -e "httpd-logs\t\t${timestamp}\t\ttar\t\t$(du -sh /tmp/${tar_name} | cut -f1)" >> "${inventory_file}"
+
+# Cron Job
+cron_job_file="/etc/cron.d/automation"
+
+# Check if cron job is scheduled
+if [ ! -f "${cron_job_file}" ]; then
+    echo -e "* * * * * root /root/Automation_Project/automation.sh" > "${cron_job_file}"
+fi
